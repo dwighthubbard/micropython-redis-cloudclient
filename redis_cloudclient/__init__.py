@@ -2,7 +2,7 @@ import sys
 from uredis_modular.client import Client
 
 
-__version__ = '0.0.0'
+__version__ = '0.0.6'
 
 
 class RedisStream(object):
@@ -103,6 +103,7 @@ class EventLoop(object):
             redis_port = get('redis_port')
             if redis_port:
                 redis_port = int(redis_port)
+        print('Connecting to Redis server at %s:%d' % (redis_server, redis_port))
         self.redis_connection = Client(redis_server, redis_port)
 
         self.name = get('name')

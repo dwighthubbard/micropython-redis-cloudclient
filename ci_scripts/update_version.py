@@ -54,4 +54,4 @@ def update_setup_version(filename=None, version=None):
 
 if __name__ == '__main__':
     update_setup_version('setup.py')
-    update_dunder_init_version('microqueue/__init__.py')
+    update_dunder_init_version('redis_cloudclient/__init__.py')

@@ -8,8 +8,8 @@ from setuptools import setup
 setup(
     name='micropython-redis-cloudclient',
     description='Micropython client that allows network attached boards to be controlled from a central redis server',
-    long_description="""
-    """,
+    long_description="""Provides a client that allows one a network capable micropython board to
+interface with a central redis server.""",
     url='https://github.com/dhubbard/micropython-redis-cloudclient',
     author='Dwight Hubbard',
     author_email="dwight@dwighthubbard.com",
@@ -18,6 +18,6 @@ setup(
     maintainer='Dwight Hubbard',
     maintainer_email='dwight@dwighthubbard.com',
     packages=['redis_cloudclient'],
-    version='0.0.1',
+    version='0.0.4',
     zip_safe=True,
 )

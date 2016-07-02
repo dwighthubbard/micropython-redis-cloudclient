@@ -27,7 +27,7 @@ def update_dunder_init_version(filename, version=None):
         if infile:
             with open(filename, 'w') as write_handle:
                 for line in infile:
-                    if '__version__' in line:
+                    if line.startswith('__version__'):
                         temp = line.split('=')
                         temp[-1] = ' ' + repr(version) + '\n'
                         line = '='.join(temp)

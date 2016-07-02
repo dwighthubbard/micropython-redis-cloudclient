@@ -1,4 +1,8 @@
+import sys
 from uredis_modular.client import Client
+
+
+__version__ = '0.0.0'
 
 
 class RedisStream(object):
@@ -173,7 +177,9 @@ class EventLoop(object):
             server.  Default: 30 seconds
         """
         key = 'board:' + self.name
+        key_info = 'boardinfo:' + self.name
         self.redis_connection.execute_command('SETEX', key, ttl, state)
+        self.redis_connection.execute_command('SETEX', key_info, ttl, sys.platform)
 
     def read_command(self, timeout=25):
         """
@@ -219,5 +225,19 @@ def start():
     """
     Start the event loop
     """
+    print('Redis CloudClient version %r starting' % __version__)
     eventloop = EventLoop()
     eventloop.run()
+
+
+def autostart():
+    """
+    Add startup code to main.py
+    """
+    code = """
+# Added by redis_cloudclient
+import redis_cloudclient
+redis_cloudclient.start()
+"""
+    with open('main.py', 'a') as fh:
+        fh.write(code)

@@ -1,3 +1,37 @@
 # Micropython Redis Cloud Client
 
-Provides a client that allows one or more boards running micropython to be controlled from a central redis server.
+Provides a client that allows one a network capable micropython board to 
+interface with a central redis server.
+
+# Quickstart
+
+## Configure the redis server settings to point to the redis server
+
+The Redis Cloud Client uses the bootconfig.config module to get/set the 
+configuration.
+
+If the board is not configured, the settings can be done manually using 
+the bootconfig.config module.  In the example below replace [server]
+with the redis server ip address and [serverport] with the port that
+redis is running on.
+
+These values will be saved so this step only has to be run once.
+
+    from bootconfig.config import set
+    set('redis_server', '[server]')
+    set('redis_port', '[serverport]')
+
+## Run the start function to start the client.
+
+The following 2 lines will start the client.  They can be added to the
+end of the main.py to make the board run the client at start.
+
+    import redis_cloudclient
+    redis_cloudclient.start()
+    
+# Example of starting the client manually at the repl.
+
+    MicroPython v1.8.1-156-gf3636a7-dirty on 2016-07-01; ESP module with ESP8266
+    Type "help()" for more information.
+    >>> import redis_cloudclient
+    >>> redis_cloudclient.start()

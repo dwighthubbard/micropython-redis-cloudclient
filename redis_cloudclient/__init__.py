@@ -1,141 +1,223 @@
-import machine
-import uos
-from bootconfig.config import get
 from uredis_modular.client import Client
-
-
 
 
 class RedisStream(object):
     redis_key = b'RedisRepl'
-    buffersize = 256  # Size of the buffer in bytes
+    buffersize = 80  # Size of the buffer in bytes
     _read_position = 0
     _connection = None
 
-    def __init__(self, host=None, port=6379, redis=None, redis_key=None, buffer_size=256):
+    def __init__(self, redis, redis_key, buffer_size=256):
         self._connection = redis
-        if not redis:
-            if not host:
-                try:
-                    host = get('redis_server')
-                    if port==6379:
-                        port = int(get('redis_port'))
-                except ImportError:
-                    pass
-            self._connection = Client(host, port)
-        if redis_key:
-            self.redis_key = redis_key
-        else:
-            redis_key = self.name + '.stdout'
+        self.redis = redis
+        self.redis_key = redis_key
+        self.redis_stdout_key = redis_key + '.stdout'
+        self.redis_stdin_key = redis_key + '.stdin'
         self._buffer_size = buffer_size
         self.clear()
 
     def read(self, size=None):
+        """
+        Read from the input key stored in the redis server
+
+        Parameters
+        ----------
+        size: int, optional
+            How many bytes to read, if not specified reads everyting
+
+        Returns
+        -------
+        bytes:
+            Data read
+        """
         if size:
             end = self._read_position + size
         else:
             end = -1
-        data = self._connection.execute_command('GETRANGE', self.redis_key + '.stdin', self._read_position, end)
+        data = self._connection.execute_command('GETRANGE', self.redis_stdin_key, self._read_position, end)
         self._read_position += len(data)
         return data
 
     def write(self, data):
+        """
+        Write data bytestring to a string in the output redis key
+
+        Parameters
+        ----------
+        data : bytes
+            The bytestring to write
+
+        Returns
+        -------
+        The number of bytes written
+        """
         if '\n' in data:
             self.flush()
+
         buffer_remaining = self._buffer_size - len(self._buffer)
         if len(data) > buffer_remaining:
             self.flush()
         if len(data) > self._buffer_size:
-            self._connection.execute_command('APPEND', self.redis_key, bytes(data))
+            self._connection.execute_command('APPEND', self.redis_stdout_key, bytes(data))
         else:
             self._buffer += bytes(data)
 
         return len(data)
 
     def flush(self):
+        """
+        Write buffered data to the output key on the redis server and reset the buffer.
+        """
         if not self._buffer:
             return
-        self._connection.execute_command('APPEND', self.redis_key, self._buffer)
+        self._connection.execute_command('APPEND', self.redis_stdout_key, self._buffer)
         self._buffer = bytes()
 
     def clear(self):
+        """
+        Clear all data from the redis output key on the redis server
+        """
         self._buffer = bytes()
-        self._connection.execute_command('DEL', self.redis_key)
+        self._connection.execute_command('DEL', self.redis_stdout_key)
+        self._connection.execute_command('DEL', self.redis_stdin_key)
 
 
-def heartbeat(connection, name, state='idle', ttl=30):
-    key = 'board:' + name
-    connection.execute_command('SETEX', key, ttl, state)
+class EventLoop(object):
+    """
+    Main eventloop object to handle various events on the device
+    """
 
+    def __init__(self, redis_server=None, redis_port=18266, enable_logging=False):
+        self.enable_logging = enable_logging
+        if self.enable_logging:
+            from .logging import Logger
+            self.logger = Logger(self.redis_connection, self.name)
 
-class Logger(object):
-    levels = dict(
-        DEBUG = 10,
-        INFO = 20
-    )
+        if not redis_server:
+            from bootconfig.config import get, set
+            redis_server = get('redis_server')
+            redis_port = get('redis_port')
+            if redis_port:
+                redis_port = int(redis_port)
+        self.redis_connection = Client(redis_server, redis_port)
 
-    def __init__(self, redis_connection, name):
-        self.redis_connection = redis_connection
-        self.redis_key = name + '.logging'
-        self.get_log_level()
+        self.name = get('name')
+        self.base_key = 'repl:' + self.name
+        self.command_key = self.base_key + '.command'
+        self.console_key = self.base_key + '.console'
+        self.complete_key = self.base_key + '.complete'
+        self.console = RedisStream(redis=self.redis_connection, redis_key=self.console_key)
+        from uos import dupterm
+        self.clear_keys()
+        self.console.clear()
+        dupterm(self.console)
 
-    def get_log_level(self):
-        log_level = self.redis_connection.execute_command('GET', self.redis_key)
-        if not log_level:
-            log_level = self.levels['INFO']
-        self.log_level = int(log_level)
-        return self.log_level
+    def clear_keys(self):
+        """
+        Clear the redis keys for this eventloop
+        """
+        for key in [self.complete_key, self.console_key]:
+            self.redis_connection.execute_command('DEL', key)
 
-    def debug(self, *args, **kwargs):
-        if self.log_level > self.levels['DEBUG']:
-            return
-        print(*args, **kwargs)
+    def exec_command(self, command):
+        """
+        Execute a single command.
 
-    def info(self, *args, **kwargs):
-        if self.log_level > self.levels['INFO']:
-            return
-        print(*args, **kwargs)
+        Parameters
+        ----------
+        command: bytes
+            The command to execute
 
+        Returns
+        -------
+        int
+            The return code of the command, will be 0 if the command completed
+            sucessfully and 1 if it generated an exception.
+        """
+        self.console.clear()
+        self.clear_completion_queue()
+        self.heartbeat(state=b'running', ttl=300)
+        try:
+            exec(command)
+            rc = 0
+        except Exception as exc:
+            from sys import print_exception
+            print_exception(exc)
+            rc = 1
+        self.console.flush()
+        self.signal_completion(rc)
+        self.heartbeat(state=b'idle')
+        return rc
 
-def eventloop():
-    # from microqueue import MicroQueue
-    from bootconfig.config import get
+    def clear_completion_queue(self):
+        self.redis_connection.execute_command('DEL', self.complete_key)
 
-    redis_connection = Client(get('redis_server'), get('redis_port'))
-    name = get('name')
+    def signal_completion(self, rc):
+        """
+        Put the return code in the completion queue
+        """
+        self.redis_connection.execute_command('RPUSH', self.complete_key, rc)
 
-    name_in = 'repl:' + name
-    in_key = name_in + '.command'
-    name_stdout = name_in + '.stdout'
-    name_complete = name_in + '.complete'
-    # logger = Logger(redis_connection, name)
-    # logger.debug('queue name', 'hotqueue:'+name_in)
-    # logger.debug('stdout_key', name_stdout)
-    # q_complete=MicroQueue(name_complete, redis=redis_connection)
+    def heartbeat(self, state=b'idle', ttl=30):
+        """
+        Update the board heartbeat key (and it's time to live)
 
-    out_stream = RedisStream(redis_key=name_stdout, redis=redis_connection)
-    uos.dupterm(out_stream)
+        Parameters
+        ----------
+        state : bytes, optional
+            The state the board is in
 
-    while True:
-        heartbeat(redis_connection, name, state=b'idle')
-        command = redis_connection.execute_command('BLPOP', in_key, 25)
+        ttl : int, optional
+            The time to live in seconds for the key.  After
+            the ttl expires the key is removed from the redis
+            server.  Default: 30 seconds
+        """
+        key = 'board:' + self.name
+        self.redis_connection.execute_command('SETEX', key, ttl, state)
+
+    def read_command(self, timeout=25):
+        """
+        Read a command from the command list
+
+        Parameters
+        ----------
+        timeout : int optionall
+            How long to wait for a command to become available before timing out.  A value of
+            0 will never timeout.  Default: 25 seconds
+
+        Returns
+        -------
+        bytes
+            The command read from the queue, or None if it timed out.
+        """
+        command = self.redis_connection.execute_command('BLPOP', self.command_key, 25)
         if command:
-            # logger.get_log_level()
-            command = command[1]
-            # logger.debug('running command:', command)
-            out_stream.clear()
-            # q_complete.clear()
-            heartbeat(redis_connection, name, state=b'running', ttl=120)
-            rc = exec_command(command)
-            out_stream.flush()
-            # q_complete.put(rc)
+            return command[1]
 
+    # Operations handlers
+    def handle_command(self):
+        """
+        Check for and execute commands from the command queue
+        """
+        command = self.read_command()
+        if command:
+            if self.enable_logging:
+                self.logger.get_log_level()
+                self.logger.debug('running command:', command)
 
-def exec_command(command):
-    try:
-        exec(command)
-        return 0
-    except Exception as exc:
-        from sys import print_exception
-        print_exception(exc)
-        return 1
+            rc = self.exec_command(command)
+
+    def run(self):
+        """
+        Start the eventloop
+        """
+        while True:
+            self.heartbeat(state=b'idle')
+            self.handle_command()
+
+def start():
+    """
+    Start the event loop
+    """
+    eventloop = EventLoop()
+    eventloop.run()

@@ -118,7 +118,7 @@ class EventLoop(object):
         bytes
             The command read from the queue, or None if it timed out.
         """
-        command = self.redis_connection.execute_command('BLPOP', self.command_key, 25)
+        command = self.redis_connection.execute_command('BLPOP', self.command_key, 1)
         if command:
             return command[1]
 

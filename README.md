@@ -46,6 +46,6 @@ end of the main.py to make the board run the client at start.
 The following command will add the cloudclient to the main.py.  This
 only needs to be run once.
 
-    import redis_cloudclient
-    redis_cloudclient.autostart()
+    import redis_cloudclient.service
+    redis_cloudclient.service.autostart()
     

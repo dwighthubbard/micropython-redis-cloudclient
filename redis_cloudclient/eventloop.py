@@ -2,7 +2,6 @@
 Eventloop functionality
 """
 import sys
-from .console import RedisStream
 from uredis_modular.client import Client
 
 
@@ -15,7 +14,7 @@ class EventLoop(object):
         self.enable_logging = enable_logging
 
         if not redis_server:
-            from bootconfig.config import get, set
+            from bootconfig.config import get
             redis_server = get('redis_server')
             redis_port = get('redis_port')
             if redis_port:
@@ -32,11 +31,14 @@ class EventLoop(object):
             from .logging import Logger
             self.logger = Logger(self.redis_connection, self.name)
 
+        from .console import RedisStream
         self.console = RedisStream(redis=self.redis_connection, redis_key=self.console_key)
-        from uos import dupterm
+        if sys.platform not in ['WiPya']:
+            from uos import dupterm
+            dupterm(self.console)
         self.clear_keys()
         self.console.clear()
-        dupterm(self.console)
+
 
     def clear_keys(self):
         """
@@ -62,7 +64,7 @@ class EventLoop(object):
         """
         self.console.clear()
         self.clear_completion_queue()
-        self.heartbeat(state=b'running', ttl=300)
+        self.heartbeat(state=b'running', ttl=30)
         try:
             exec(command)
             rc = 0
@@ -84,7 +86,7 @@ class EventLoop(object):
         """
         self.redis_connection.execute_command('RPUSH', self.complete_key, rc)
 
-    def heartbeat(self, state=b'idle', ttl=30):
+    def heartbeat(self, state=b'idle', ttl=300):
         """
         Update the board heartbeat key (and it's time to live)
 

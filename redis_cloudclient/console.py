@@ -2,6 +2,7 @@
 Console functionality
 """
 
+
 class RedisStream(object):
     """
     File I/O object that streams data to/from redis keys (strings)
@@ -56,6 +57,10 @@ class RedisStream(object):
         -------
         The number of bytes written
         """
+        if not self.buffer_size:
+            self._connection.execute_command('APPEND', self.redis_stdout_key, bytes(data))
+            return len(data)
+
         if '\n' in data:
             self.flush()
 
@@ -85,3 +90,36 @@ class RedisStream(object):
         self._buffer = bytes()
         self._connection.execute_command('DEL', self.redis_stdout_key)
         self._connection.execute_command('DEL', self.redis_stdin_key)
+
+    def deinit(self):
+        pass
+
+    def any(self):
+        strlen = int(self._connection.execute_command('STRLEN', self.redis_stdin_key))
+        return strlen - self._read_position
+
+    def sendbreak(self):
+        pass
+
+    def readall(self):
+        return self.read()
+
+    def readinto(buf, nbytes=0):
+        pass
+
+    def readline(self):
+        pass
+
+
+class NullIO(object):
+    def read(self):
+        pass
+
+    def write(self):
+        pass
+
+    def clear(self):
+        pass
+
+    def flush(self):
+        pass

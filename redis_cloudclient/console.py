@@ -8,12 +8,10 @@ class RedisStream(object):
     File I/O object that streams data to/from redis keys (strings)
 
     """
-    redis_key = b'RedisRepl'
-    buffersize = 80  # Size of the buffer in bytes
     _read_position = 0
     _connection = None
 
-    def __init__(self, redis, redis_key, buffer_size=256):
+    def __init__(self, redis, redis_key, buffer_size=80):
         self._connection = redis
         self.redis = redis
         self.redis_key = redis_key

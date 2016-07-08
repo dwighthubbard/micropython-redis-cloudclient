@@ -10,8 +10,8 @@ class EventLoop(object):
     Main eventloop object to handle various events on the device
     """
     handlers = {
-        'exec': 'exec_command',
-        'copy': 'copy_file'
+        'command': 'exec_command',
+        'print': 'print_message'
     }
     def __init__(self, name=None, redis_server=None, redis_port=18266, enable_logging=False):
         self.enable_logging = enable_logging
@@ -70,7 +70,8 @@ class EventLoop(object):
                 except AttributeError:
                     # No method with the specified name
                     continue
-                self.handlers[key] = operation
+                del self.handlers[key]
+                self.handlers[self.base_key + '.' + key] = operation
 
     def _get_redis_host_and_port(self):
         """
@@ -125,36 +126,42 @@ class EventLoop(object):
         self.redis_connection.execute_command('SETEX', key, ttl, state)
         self.redis_connection.execute_command('SETEX', key_info, ttl, sys.platform)
 
-    def read_command(self, timeout=25):
+    def keyname_to_handler(self, key):
         """
-        Read a command from the command list
+        Convert a keyname to a handler name
 
         Parameters
         ----------
-        timeout : int optionall
-            How long to wait for a command to become available before timing out.  A value of
-            0 will never timeout.  Default: 25 seconds
+        key : bytes
+            The redis keyname
 
         Returns
         -------
         bytes
-            The command read from the queue, or None if it timed out.
+            The handler name or None if no such handler
         """
-        command = self.redis_connection.execute_command('BLPOP', self.command_key, 1)
-        if command:
-            return command[1]
+        if key.startswith(self.base_key + '.'):
+            handler = key[len(self.base_key)+1:]
+            if handler in self.handlers.keys():
+                return handler
 
-    def handle_command(self):
+    def handle_queues(self):
         """
         Check for and execute commands from the command queue
+
+        This willl listen to all the handler queues and call the handler
+        with the value from the associated queue.
         """
-        command = self.read_command()
-        if command:
+        command = ['BLPOP'] + self.handlers.keys() + [1]
+        response = self.redis_connection.execute_command(*command)
+        if response:
+            queuekey, value = response
+            handler = self.handlers.get(queuekey, self.not_implemented)
             if self.enable_logging:
                 self.logger.get_log_level()
-                self.logger.debug('running command:', command)
-
-            rc = self.exec_command(command)
+                self.logger.debug('running handler %r', handler)
+            print('running handler %r with value %r' % (handler, value))
+            rc = handler(self, value)
 
     def run(self):
         """
@@ -162,9 +169,16 @@ class EventLoop(object):
         """
         while True:
             self.heartbeat(state=b'idle')
-            self.handle_command()
+            self.handle_queues()
+
 
     # Operations handlers
+    def not_implemented(self, queuekey):
+        """
+        Handler that gets called if no handler is defined
+        """
+        print('Recieved an event for a non-existant operation %r' % queuekey)
+
     def exec_command(self, command):
         """
         Execute a single command.
@@ -194,6 +208,9 @@ class EventLoop(object):
         self.signal_completion(rc)
         self.heartbeat(state=b'idle')
         return rc
+
+    def print_message(self, message):
+        print(message)
 
 
 def start():

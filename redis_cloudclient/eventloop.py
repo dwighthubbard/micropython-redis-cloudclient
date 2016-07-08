@@ -11,7 +11,9 @@ class EventLoop(object):
     """
     handlers = {
         'command': 'exec_command',
-        'print': 'print_message'
+        'copy': 'copy_file',
+        'print': 'print_message',
+        'rename': 'rename_board'
     }
     def __init__(self, name=None, redis_server=None, redis_port=18266, enable_logging=False):
         self.enable_logging = enable_logging
@@ -63,15 +65,17 @@ class EventLoop(object):
         Iterate the handlers dictionary and replace string handler names with
         the method
         """
-        for key in self.handlers.keys():
+        for key, value in self.handlers.items():
             if isinstance(self.handlers[key], str):
                 try:
-                    operation = getattr(self, key)
+                    operation = getattr(self, self.handlers[key])
                 except AttributeError:
                     # No method with the specified name
+                    print('No method %r found' % self.handlers[key])
                     continue
                 del self.handlers[key]
-                self.handlers[self.base_key + '.' + key] = operation
+                new_key = self.base_key + '.' + key
+                self.handlers[new_key.encode()] = operation
 
     def _get_redis_host_and_port(self):
         """
@@ -145,14 +149,14 @@ class EventLoop(object):
             if handler in self.handlers.keys():
                 return handler
 
-    def handle_queues(self):
+    def handle_queues(self, timeout=1):
         """
         Check for and execute commands from the command queue
 
         This willl listen to all the handler queues and call the handler
         with the value from the associated queue.
         """
-        command = ['BLPOP'] + self.handlers.keys() + [1]
+        command = ['BLPOP'] + list(self.handlers.keys()) + [timeout]
         response = self.redis_connection.execute_command(*command)
         if response:
             queuekey, value = response
@@ -160,8 +164,7 @@ class EventLoop(object):
             if self.enable_logging:
                 self.logger.get_log_level()
                 self.logger.debug('running handler %r', handler)
-            print('running handler %r with value %r' % (handler, value))
-            rc = handler(self, value)
+            rc = handler(value)
 
     def run(self):
         """
@@ -178,6 +181,21 @@ class EventLoop(object):
         Handler that gets called if no handler is defined
         """
         print('Recieved an event for a non-existant operation %r' % queuekey)
+
+    def copy_file(self, filename, buffer_size=256):
+        self.heartbeat(state=b'copying', ttl=30)
+        file_key = b'file:' + self.name + b':' + filename
+        file_size = int(self.redis_connection.execute_command('STRLEN', file_key))
+        position = 0
+        while True:
+            with open(filename, 'w') as file_handle:
+                end = position + buffer_size
+                data = self.redis_connection.execute_command('GETRANGE', file_key, position, end)
+                if data:
+                    file_handle.write(data)
+                if len(data) < buffer_size:
+                    break
+                position += len(data)
 
     def exec_command(self, command):
         """
@@ -210,7 +228,15 @@ class EventLoop(object):
         return rc
 
     def print_message(self, message):
-        print(message)
+        print(message.decode())
+
+    def rename_board(self, name):
+        name = name.decode()
+        from bootconfig.config import set
+        self.heartbeat(state=b'renaming', ttl=1)
+        self.name = name
+        set('name', name)
+        self.heartbeat(state=b'idle')
 
 
 def start():

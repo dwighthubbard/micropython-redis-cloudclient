@@ -55,7 +55,7 @@ class RedisStream(object):
         -------
         The number of bytes written
         """
-        if not self.buffer_size:
+        if not self._buffer_size:
             self._connection.execute_command('APPEND', self.redis_stdout_key, bytes(data))
             return len(data)
 

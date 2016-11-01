@@ -39,7 +39,7 @@ class EventLoop(object):
         """
         Clear the redis keys for this eventloop
         """
-        for key in [self.complete_key, self.console_key]:
+        for key in [self.command_key, self.complete_key, self.console_key]:
             self.redis_connection.execute_command('DEL', key)
 
     def _determine_keys(self):

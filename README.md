@@ -20,6 +20,7 @@ These values will be saved so this step only has to be run once.
     from bootconfig.config import set
     set('redis_server', '[server]')
     set('redis_port', '[serverport]')
+    set('name', '[boardname]')
 
 ## Run the start function to start the client.
 

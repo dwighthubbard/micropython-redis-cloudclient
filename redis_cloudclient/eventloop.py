@@ -26,6 +26,8 @@ class EventLoop(object):
         self.redis_connection = Client(self.redis_server, self.redis_port)
 
         self._determine_keys()
+        print('Registering with the server as %r' % self.name)
+
         self._enable_logging()
         self._find_handlers()
         self._initialize_console()
@@ -95,7 +97,8 @@ class EventLoop(object):
         """
         from .console import RedisStream
         self.console = RedisStream(redis=self.redis_connection, redis_key=self.console_key)
-        if sys.platform not in ['WiPy']:
+        # if sys.platform not in ['WiPy']:
+        if True:
             # Dupterm is currently broken on wipy
             from uos import dupterm
             dupterm(self.console)

@@ -22,7 +22,7 @@ class EventLoop(object):
         self.redis_port = redis_port
 
         self._get_redis_host_and_port()
-        print('Connecting to Redis server at %s:%d' % (self.redis_server, self.redis_port))
+        print('Connecting to cloudmanager server at %s:%d' % (self.redis_server, self.redis_port))
         self.redis_connection = Client(self.redis_server, self.redis_port)
 
         self._determine_keys()
@@ -97,8 +97,7 @@ class EventLoop(object):
         """
         from .console import RedisStream
         self.console = RedisStream(redis=self.redis_connection, redis_key=self.console_key)
-        # if sys.platform not in ['WiPy']:
-        if True:
+        if sys.platform not in ['WiPy']:
             # Dupterm is currently broken on wipy
             from uos import dupterm
             dupterm(self.console)

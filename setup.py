@@ -13,7 +13,10 @@ interface with a central redis server.""",
     url='https://github.com/dhubbard/micropython-redis-cloudclient',
     author='Dwight Hubbard',
     author_email="dwight@dwighthubbard.com",
-    install_requires=['micropython-redis.client', 'micropython-bootconfig'],
+    install_requires=[
+        # 'micropython-redis.client', 
+        'micropython-redis-modular', 'micropython-bootconfig'
+    ],
     license='MIT',
     maintainer='Dwight Hubbard',
     maintainer_email='dwight@dwighthubbard.com',

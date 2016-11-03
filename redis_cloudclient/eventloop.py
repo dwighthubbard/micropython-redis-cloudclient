@@ -187,6 +187,10 @@ class EventLoop(object):
     def copy_file(self, filename, buffer_size=256):
         self.heartbeat(state=b'copying', ttl=30)
         file_key = b'file:' + self.name + b':' + filename
+        file_dest_key = b'filedest:' + self.name + b':' + filename
+        dest = self.redis_connection.execute_command('GET', file_dest_key)
+        if dest:
+            filename = dest
         file_size = int(self.redis_connection.execute_command('STRLEN', file_key))
         position = 0
         while True:

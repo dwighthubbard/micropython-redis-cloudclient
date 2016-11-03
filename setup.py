@@ -15,7 +15,8 @@ interface with a central redis server.""",
     author_email="dwight@dwighthubbard.com",
     install_requires=[
         # 'micropython-redis.client', 
-        'micropython-redis-modular', 'micropython-bootconfig'
+        'micropython-redis-modular', 
+        'micropython-bootconfig'
     ],
     license='MIT',
     maintainer='Dwight Hubbard',

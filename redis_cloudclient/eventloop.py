@@ -50,10 +50,15 @@ class EventLoop(object):
         if not self.name:
             from bootconfig.config import get
             self.name = get('name')
-        self.base_key = 'repl:' + self.name
-        self.command_key = self.base_key + '.command'
-        self.console_key = self.base_key + '.console'
-        self.complete_key = self.base_key + '.complete'
+            if not self.name:
+                from bootconfig.config import set
+                import time
+                self.name = self.platform + str(int(time.time()))
+                set('name', self.name)
+        self.base_key = b'repl:' + self.name
+        self.command_key = self.base_key + b'.command'
+        self.console_key = self.base_key + b'.console'
+        self.complete_key = self.base_key + b'.complete'
 
     def _enable_logging(self):
         """
@@ -131,8 +136,8 @@ class EventLoop(object):
             the ttl expires the key is removed from the redis
             server.  Default: 30 seconds
         """
-        key = 'board:' + self.name
-        key_info = 'boardinfo:' + self.name
+        key = b'board:' + self.name
+        key_info = b'boardinfo:' + self.name
         self.redis_connection.execute_command('SETEX', key, ttl, state)
         self.redis_connection.execute_command('SETEX', key_info, ttl, sys.platform)
 

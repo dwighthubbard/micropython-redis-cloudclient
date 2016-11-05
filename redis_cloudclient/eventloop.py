@@ -155,7 +155,7 @@ class EventLoop(object):
         bytes
             The handler name or None if no such handler
         """
-        if key.startswith(self.base_key + '.'):
+        if key.startswith(self.base_key + b'.'):
             handler = key[len(self.base_key)+1:]
             if handler in self.handlers.keys():
                 return handler

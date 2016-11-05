@@ -157,6 +157,7 @@ class EventLoop(object):
         """
         if key.startswith(self.base_key + b'.'):
             handler = key[len(self.base_key)+1:]
+            print(handler, self.handlers.keys())
             if handler in self.handlers.keys():
                 return handler
 
@@ -233,6 +234,7 @@ class EventLoop(object):
         self.heartbeat(state=b'running', ttl=30)
         try:
             # exec(command)
+            self.logger.debug('Running command %r' % command)
             self.executable_command(command)
             rc = 0
         except Exception as exc:

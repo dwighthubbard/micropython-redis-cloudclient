@@ -82,7 +82,7 @@ class EventLoop(object):
                     print('No method %r found' % self.handlers[key])
                     continue
                 del self.handlers[key]
-                new_key = self.base_key + b'.' + key
+                new_key = self.base_key + b'.' + key.encode()
                 self.handlers[new_key.decode()] = operation
 
     def _get_redis_host_and_port(self):

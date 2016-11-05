@@ -6,7 +6,7 @@ class Logger(object):
 
     def __init__(self, redis_connection, name):
         self.redis_connection = redis_connection
-        self.redis_key = name + '.logging'
+        self.redis_key = name + b'.logging'
         self.get_log_level()
 
     def get_log_level(self):

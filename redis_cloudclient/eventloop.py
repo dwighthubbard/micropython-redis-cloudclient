@@ -226,7 +226,8 @@ class EventLoop(object):
         self.clear_completion_queue()
         self.heartbeat(state=b'running', ttl=30)
         try:
-            exec(command)
+            # exec(command)
+            self.executable_command(command)
             rc = 0
         except Exception as exc:
             from sys import print_exception

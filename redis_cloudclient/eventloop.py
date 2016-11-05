@@ -30,7 +30,11 @@ class EventLoop(object):
         print('Registering with the server as %r' % self.name.decode())
 
         self._enable_logging()
+
+        self.logger.debug('self._find_handlers()')
         self._find_handlers()
+
+        self.logger.debug('self._initialize_console()')
         self._initialize_console()
 
     ################################################################
@@ -158,7 +162,8 @@ class EventLoop(object):
         if key.startswith(self.base_key + b'.'):
             handler = key[len(self.base_key)+1:]
             print(handler, self.handlers.keys())
-            return self.handlers.get(handler, None)
+            if self.handlers.get(handler, None):
+                return handler
 
     def handle_queues(self, timeout=1):
         """

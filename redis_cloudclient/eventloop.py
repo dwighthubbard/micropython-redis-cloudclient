@@ -15,6 +15,7 @@ class EventLoop(object):
         'print': 'print_message',
         'rename': 'rename_board'
     }
+    executable_command = exec
     def __init__(self, name=None, redis_server=None, redis_port=18266, enable_logging=False):
         self.enable_logging = enable_logging
         self.name = name
@@ -97,7 +98,10 @@ class EventLoop(object):
         """
         from .console import RedisStream
         self.console = RedisStream(redis=self.redis_connection, redis_key=self.console_key)
-        if sys.platform not in ['WiPy']:
+        if sys.platform in ['linux']:
+            import uos
+            self.executable_command = uos.system
+        elif sys.platform not in ['WiPy']:
             # Dupterm is currently broken on wipy
             from uos import dupterm
             dupterm(self.console)

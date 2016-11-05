@@ -15,7 +15,6 @@ class EventLoop(object):
         b'print': b'print_message',
         b'rename': b'rename_board'
     }
-    executable_command = exec
     def __init__(self, name=None, redis_server=None, redis_port=18266, enable_logging=False):
         self.enable_logging = enable_logging
         self.name = name
@@ -94,11 +93,8 @@ class EventLoop(object):
         """
         from .console import RedisStream
         self.console = RedisStream(redis=self.redis_connection, redis_key=self.console_key)
-        if sys.platform in ['linux']:
-            import uos
-            self.executable_command = uos.system
-        elif sys.platform not in ['WiPy']:
-            # Dupterm is currently broken on wipy
+        if sys.platform not in ['WiPy', 'linux']:
+            # Dupterm is currently broken on wipy and unix
             from uos import dupterm
             dupterm(self.console)
         self.clear_keys()
@@ -163,7 +159,6 @@ class EventLoop(object):
         response = self.redis_connection.execute_command(*command)
         if response:
             queuekey, value = response
-            print(queuekey, self.handlers.keys())
             handler = self.handlers.get(queuekey, self.not_implemented)
             if self.enable_logging:
                 print('running handler %r', self.keyname_to_handler(handler))
@@ -223,8 +218,7 @@ class EventLoop(object):
         self.clear_completion_queue()
         self.heartbeat(state=b'running', ttl=30)
         try:
-            # exec(command)
-            self.executable_command(command)
+            exec(command)
             rc = 0
         except Exception as exc:
             from sys import print_exception

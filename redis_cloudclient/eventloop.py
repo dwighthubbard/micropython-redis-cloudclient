@@ -74,7 +74,7 @@ class EventLoop(object):
         the method
         """
         for key, value in self.handlers.items():
-            if isinstance(self.handlers[key], str):
+            if isinstance(self.handlers[key], bytes):
                 try:
                     operation = getattr(self, self.handlers[key])
                 except AttributeError:
@@ -83,7 +83,7 @@ class EventLoop(object):
                     continue
                 del self.handlers[key]
                 new_key = self.base_key + b'.' + key
-                self.handlers[new_key.encode()] = operation
+                self.handlers[new_key] = operation
 
     def _get_redis_host_and_port(self):
         """

@@ -83,7 +83,7 @@ class EventLoop(object):
                     continue
                 del self.handlers[key]
                 new_key = self.base_key + b'.' + key.encode()
-                self.handlers[new_key.decode()] = operation
+                self.handlers[new_key] = operation
 
     def _get_redis_host_and_port(self):
         """

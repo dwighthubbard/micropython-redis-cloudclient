@@ -256,10 +256,10 @@ class EventLoop(object):
         self.heartbeat(state=b'idle')
 
 
-def start():
+def start(enable_logging=False):
     """
     Start the event loop
     """
     print('Redis CloudClient starting')
-    eventloop = EventLoop()
+    eventloop = EventLoop(enable_logging=enable_logging)
     eventloop.run()

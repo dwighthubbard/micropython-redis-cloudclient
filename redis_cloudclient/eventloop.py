@@ -195,8 +195,8 @@ class EventLoop(object):
         print('Copying file %r' % filename)
         # file_size = int(self.redis_connection.execute_command('STRLEN', file_key))
         position = 0
-        while True:
-            with open(filename, 'w') as file_handle:
+        with open(filename, 'wb') as file_handle:
+            while True:
                 end = position + buffer_size
                 data = self.redis_connection.execute_command('GETRANGE', file_key, position, end)
                 if data:

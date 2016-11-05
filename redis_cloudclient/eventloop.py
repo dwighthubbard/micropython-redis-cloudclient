@@ -78,15 +78,20 @@ class EventLoop(object):
         the method
         """
         for key, value in self.handlers.items():
+            self.logger.debug('1')
             if isinstance(self.handlers[key], str):
+                self.logger.debug('2')
                 try:
                     operation = getattr(self, self.handlers[key])
                 except AttributeError:
                     # No method with the specified name
                     print('No method %r found' % self.handlers[key])
                     continue
+                self.logger.debug('3')
                 del self.handlers[key]
+                self.logger.debug('4')
                 new_key = self.base_key + b'.' + key.encode()
+                self.logger.debug('5')
                 self.handlers[new_key] = operation
 
     def _get_redis_host_and_port(self):

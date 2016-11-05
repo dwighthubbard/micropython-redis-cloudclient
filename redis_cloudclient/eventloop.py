@@ -27,7 +27,7 @@ class EventLoop(object):
         self.redis_connection = Client(self.redis_server, self.redis_port)
 
         self._determine_keys()
-        print('Registering with the server as %r' % self.name.encode())
+        print('Registering with the server as %r' % self.name.decode())
 
         self._enable_logging()
         self._find_handlers()

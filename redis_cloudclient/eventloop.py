@@ -10,10 +10,10 @@ class EventLoop(object):
     Main eventloop object to handle various events on the device
     """
     handlers = {
-        'command': 'exec_command',
-        'copy': 'copy_file',
-        'print': 'print_message',
-        'rename': 'rename_board'
+        b'command': b'exec_command',
+        b'copy': b'copy_file',
+        b'print': b'print_message',
+        b'rename': b'rename_board'
     }
     executable_command = exec
     def __init__(self, name=None, redis_server=None, redis_port=18266, enable_logging=False):
@@ -82,7 +82,7 @@ class EventLoop(object):
                     print('No method %r found' % self.handlers[key])
                     continue
                 del self.handlers[key]
-                new_key = self.base_key + '.' + key
+                new_key = self.base_key + b'.' + key
                 self.handlers[new_key.encode()] = operation
 
     def _get_redis_host_and_port(self):

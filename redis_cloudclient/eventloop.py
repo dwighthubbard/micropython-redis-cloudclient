@@ -158,8 +158,7 @@ class EventLoop(object):
         if key.startswith(self.base_key + b'.'):
             handler = key[len(self.base_key)+1:]
             print(handler, self.handlers.keys())
-            if handler in self.handlers.keys():
-                return handler
+            return self.handlers.get(handler, None)
 
     def handle_queues(self, timeout=1):
         """

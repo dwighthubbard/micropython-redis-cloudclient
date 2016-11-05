@@ -10,10 +10,10 @@ class EventLoop(object):
     Main eventloop object to handle various events on the device
     """
     handlers = {
-        'command': 'exec_command',
-        'copy': 'copy_file',
-        'print': 'print_message',
-        'rename': 'rename_board'
+        b'command': b'exec_command',
+        b'copy': b'copy_file',
+        b'print': b'print_message',
+        b'rename': b'rename_board'
     }
     executable_command = exec
     def __init__(self, name=None, redis_server=None, redis_port=18266, enable_logging=False):
@@ -79,10 +79,10 @@ class EventLoop(object):
         """
         for key, value in self.handlers.items():
             self.logger.debug('1', key)
-            if isinstance(self.handlers[key], str):
+            if isinstance(self.handlers[key], bytes):
                 self.logger.debug('2', key)
                 try:
-                    operation = getattr(self, self.handlers[key])
+                    operation = getattr(self, self.handlers[key].decode())
                 except AttributeError:
                     # No method with the specified name
                     print('No method %r found' % self.handlers[key])
@@ -90,7 +90,7 @@ class EventLoop(object):
                 self.logger.debug('3', key)
                 del self.handlers[key]
                 self.logger.debug('4', key)
-                new_key = self.base_key + b'.' + key.encode()
+                new_key = self.base_key + b'.' + key
                 self.logger.debug('5', key)
                 self.handlers[new_key] = operation
 

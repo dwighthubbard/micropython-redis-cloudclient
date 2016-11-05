@@ -2,6 +2,8 @@
 Eventloop functionality
 """
 import sys
+import time
+
 from uredis_modular.client import Client
 from .exceptions import RedisNotRunning
 
@@ -23,18 +25,8 @@ class EventLoop(object):
         self.redis_port = redis_port
 
         self._get_redis_host_and_port()
-        print('Connecting to cloudmanager server at %s:%d' % (self.redis_server, self.redis_port))
-        try:
-            self.redis_connection = Client(self.redis_server, self.redis_port)
-        except OSError:
-            raise RedisNotRunning(
-                'The Cloudmanager service is not running at %s:%s' % (self.redis_server, self.redis_port)
-            )
         self._determine_keys()
-        print('Registering with the server as %r' % self.name.decode())
-
         self._find_handlers()
-        self._initialize_console()
 
     ################################################################
     # Init operations
@@ -173,6 +165,17 @@ class EventLoop(object):
         """
         Start the eventloop
         """
+        print('Connecting to cloudmanager server at %s:%d' % (self.redis_server, self.redis_port))
+        try:
+            self.redis_connection = Client(self.redis_server, self.redis_port)
+        except OSError:
+            raise RedisNotRunning(
+                'The Cloudmanager service is not running at %s:%s' % (self.redis_server, self.redis_port)
+            )
+        self._initialize_console()
+        print('Registering with the server as %r' % self.name.decode())
+
+
         while True:
             self.heartbeat(state=b'idle')
             self.handle_queues()
@@ -185,11 +188,11 @@ class EventLoop(object):
         """
         print('Recieved an event for a non-existant operation %r' % queuekey)
 
-    def copy_file(self, fileinfo, buffer_size=256):
-        hash, filename = fileinfo.split('\0')
-        print('Copying file %r' % filename)
+    def copy_file(self, transaction_key, buffer_size=256):
         self.heartbeat(state=b'copying', ttl=30)
-        file_key = b'file:' + hash
+        file_key = self.redis_connection.execute_command('HGET', transaction_key, 'source')
+        filename = self.redis_connection.execute_command('HGET', transaction_key, 'dest')
+        print('Copying file %r' % filename)
         # file_size = int(self.redis_connection.execute_command('STRLEN', file_key))
         position = 0
         while True:
@@ -201,6 +204,9 @@ class EventLoop(object):
                 if len(data) < buffer_size:
                     break
                 position += len(data)
+        self.redis_connection.execute_command('DEL', transaction_key)
+        self.signal_completion(0)
+        self.heartbeat(state=b'idle')
 
     def exec_command(self, command):
         """
@@ -249,15 +255,20 @@ def start():
     Start the event loop
     """
     print('Redis CloudClient starting')
+    retry_time = 5
     eventloop = EventLoop()
     while True:
         try:
             eventloop.run()
         except RedisNotRunning:
             print(
-                'Could not connect to the cloudmanager server at %s:%s, retrying in 30 seconds' % (
-                    eventloop.redis_server, eventloop.redis_port
+                'Could not connect to the cloudmanager server at %s:%s, retrying in %d seconds' % (
+                    eventloop.redis_server, eventloop.redis_port, retry_time
                 )
             )
-            import time
-            time.sleep(30)
+            time.sleep(retry_time)
+            retry_time *= 2
+            if retry_time > 900:
+                print('Giving up')
+                break
+

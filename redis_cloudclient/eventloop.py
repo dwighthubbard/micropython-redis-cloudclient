@@ -3,6 +3,7 @@ Eventloop functionality
 """
 import sys
 from uredis_modular.client import Client
+from .exceptions import RedisNotRunning
 
 
 class EventLoop(object):
@@ -23,8 +24,12 @@ class EventLoop(object):
 
         self._get_redis_host_and_port()
         print('Connecting to cloudmanager server at %s:%d' % (self.redis_server, self.redis_port))
-        self.redis_connection = Client(self.redis_server, self.redis_port)
-
+        try:
+            self.redis_connection = Client(self.redis_server, self.redis_port)
+        except OSError:
+            raise RedisNotRunning(
+                'The Cloudmanager service is not running at %s:%s' % (self.redis_server, self.redis_port)
+            )
         self._determine_keys()
         print('Registering with the server as %r' % self.name.decode())
 
@@ -180,14 +185,12 @@ class EventLoop(object):
         """
         print('Recieved an event for a non-existant operation %r' % queuekey)
 
-    def copy_file(self, filename, buffer_size=256):
+    def copy_file(self, fileinfo, buffer_size=256):
+        hash, filename = fileinfo.split('\0')
+        print('Copying file %r' % filename)
         self.heartbeat(state=b'copying', ttl=30)
-        file_key = b'file:' + self.name + b':' + filename
-        file_dest_key = b'filedest:' + self.name + b':' + filename
-        dest = self.redis_connection.execute_command('GET', file_dest_key)
-        if dest:
-            filename = dest
-        file_size = int(self.redis_connection.execute_command('STRLEN', file_key))
+        file_key = b'file:' + hash
+        # file_size = int(self.redis_connection.execute_command('STRLEN', file_key))
         position = 0
         while True:
             with open(filename, 'w') as file_handle:
@@ -233,7 +236,7 @@ class EventLoop(object):
         print(message.decode())
 
     def rename_board(self, name):
-        name = name.decode()
+        name = name
         from bootconfig.config import set
         self.heartbeat(state=b'renaming', ttl=1)
         self.name = name
@@ -247,4 +250,14 @@ def start():
     """
     print('Redis CloudClient starting')
     eventloop = EventLoop()
-    eventloop.run()
+    while True:
+        try:
+            eventloop.run()
+        except RedisNotRunning:
+            print(
+                'Could not connect to the cloudmanager server at %s:%s, retrying in 30 seconds' % (
+                    eventloop.redis_server, eventloop.redis_port
+                )
+            )
+            import time
+            time.sleep(30)

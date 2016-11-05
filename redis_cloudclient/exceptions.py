@@ -1,0 +1,2 @@
+class RedisNotRunning(Exception):
+    pass

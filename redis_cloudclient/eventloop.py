@@ -185,7 +185,7 @@ class EventLoop(object):
             handler = self.handlers.get(queuekey, self.not_implemented)
             if self.enable_logging:
                 self.logger.get_log_level()
-                self.logger.debug('running handler %r', handler)
+                self.logger.debug('running handler %r', self.keyname_to_handler(handler))
             rc = handler(value)
 
     def run(self):

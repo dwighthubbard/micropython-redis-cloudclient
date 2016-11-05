@@ -27,7 +27,7 @@ class EventLoop(object):
         self.redis_connection = Client(self.redis_server, self.redis_port)
 
         self._determine_keys()
-        print('Registering with the server as %r' % self.name)
+        print('Registering with the server as %r' % self.name.encode())
 
         self._enable_logging()
         self._find_handlers()
@@ -53,8 +53,8 @@ class EventLoop(object):
             if not self.name:
                 from bootconfig.config import set
                 import time
-                self.name = self.platform + str(int(time.time()))
-                set('name', self.name.encode())
+                self.name = self.platform.encode() + bytes(int(time.time()))
+                set('name', self.name)
         self.base_key = b'repl:' + self.name
         self.command_key = self.base_key + b'.command'
         self.console_key = self.base_key + b'.console'

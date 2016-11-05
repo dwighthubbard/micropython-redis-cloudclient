@@ -12,7 +12,7 @@ class Logger(object):
     def get_log_level(self):
         log_level = self.redis_connection.execute_command('GET', self.redis_key)
         if not log_level:
-            log_level = self.levels['INFO']
+            log_level = self.levels['DEBUG']
         self.log_level = int(log_level)
         return self.log_level
 

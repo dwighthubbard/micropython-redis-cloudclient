@@ -171,6 +171,7 @@ class EventLoop(object):
         response = self.redis_connection.execute_command(*command)
         if response:
             queuekey, value = response
+            print(queuekey, self.handlers.keys())
             handler = self.handlers.get(queuekey, self.not_implemented)
             if self.enable_logging:
                 self.logger.get_log_level()

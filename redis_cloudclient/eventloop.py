@@ -49,12 +49,12 @@ class EventLoop(object):
         """
         if not self.name:
             from bootconfig.config import get
-            self.name = get('name')
+            self.name = get('name').encode()
             if not self.name:
                 from bootconfig.config import set
                 import time
                 self.name = self.platform + str(int(time.time()))
-                set('name', self.name)
+                set('name', self.name.encode())
         self.base_key = b'repl:' + self.name
         self.command_key = self.base_key + b'.command'
         self.console_key = self.base_key + b'.console'

@@ -29,12 +29,7 @@ class EventLoop(object):
         self._determine_keys()
         print('Registering with the server as %r' % self.name.decode())
 
-        self._enable_logging()
-
-        self.logger.debug('self._find_handlers()')
         self._find_handlers()
-
-        self.logger.debug('self._initialize_console()')
         self._initialize_console()
 
     ################################################################
@@ -64,34 +59,21 @@ class EventLoop(object):
         self.console_key = self.base_key + b'.console'
         self.complete_key = self.base_key + b'.complete'
 
-    def _enable_logging(self):
-        """
-        Create a Logger object to send logs to redis if logging is enabled.
-        """
-        if self.enable_logging:
-            from .logging import Logger
-            self.logger = Logger(self.redis_connection, self.name)
-
     def _find_handlers(self):
         """
         Iterate the handlers dictionary and replace string handler names with
         the method
         """
         for key, value in self.handlers.items():
-            self.logger.debug('1', key)
             if isinstance(self.handlers[key], bytes):
-                self.logger.debug('2', key)
                 try:
                     operation = getattr(self, self.handlers[key].decode())
                 except AttributeError:
                     # No method with the specified name
                     print('No method %r found' % self.handlers[key])
                     continue
-                self.logger.debug('3', key)
                 del self.handlers[key]
-                self.logger.debug('4', key)
                 new_key = self.base_key + b'.' + key
-                self.logger.debug('5', key)
                 self.handlers[new_key] = operation
 
     def _get_redis_host_and_port(self):
@@ -184,8 +166,7 @@ class EventLoop(object):
             print(queuekey, self.handlers.keys())
             handler = self.handlers.get(queuekey, self.not_implemented)
             if self.enable_logging:
-                self.logger.get_log_level()
-                self.logger.debug('running handler %r', self.keyname_to_handler(handler))
+                print('running handler %r', self.keyname_to_handler(handler))
             rc = handler(value)
 
     def run(self):
@@ -243,7 +224,6 @@ class EventLoop(object):
         self.heartbeat(state=b'running', ttl=30)
         try:
             # exec(command)
-            self.logger.debug('Running command %r' % command)
             self.executable_command(command)
             rc = 0
         except Exception as exc:
@@ -267,10 +247,10 @@ class EventLoop(object):
         self.heartbeat(state=b'idle')
 
 
-def start(enable_logging=False):
+def start():
     """
     Start the event loop
     """
     print('Redis CloudClient starting')
-    eventloop = EventLoop(enable_logging=enable_logging)
+    eventloop = EventLoop()
     eventloop.run()

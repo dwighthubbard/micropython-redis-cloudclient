@@ -226,6 +226,7 @@ class EventLoop(object):
         self.console.clear()
         self.clear_completion_queue()
         self.heartbeat(state=b'running', ttl=30)
+        
         try:
             exec(command)
             rc = 0
@@ -233,8 +234,8 @@ class EventLoop(object):
             from sys import print_exception
             print_exception(exc)
             rc = 1
+
         self.console.flush()
-        time.sleep(2)
         self.signal_completion(rc)
         self.heartbeat(state=b'idle')
         return rc

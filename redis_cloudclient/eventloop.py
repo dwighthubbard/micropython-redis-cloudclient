@@ -234,6 +234,7 @@ class EventLoop(object):
             print_exception(exc)
             rc = 1
         self.console.flush()
+        time.sleep(2)
         self.signal_completion(rc)
         self.heartbeat(state=b'idle')
         return rc

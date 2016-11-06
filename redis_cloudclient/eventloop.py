@@ -226,7 +226,7 @@ class EventLoop(object):
         self.console.clear()
         self.clear_completion_queue()
         self.heartbeat(state=b'running', ttl=30)
-        
+
         try:
             exec(command)
             rc = 0

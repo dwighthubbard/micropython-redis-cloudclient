@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="37a15770-c5eb-42e7-b7f9-0f13a797ba6a" name="wipy2-001" url="http://192.168.1.109">
+        <fileTransfer host="192.168.1.109" port="21" rootFolder="/flash">
+          <advancedOptions>
+            <advancedOptions compatibilityMode="true" dataProtectionLevel="Private" keepAliveTimeout="0" maxConnections="1" passiveMode="true" accurateTimestamps="NEVER" />
+          </advancedOptions>
+          <option name="port" value="21" />
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

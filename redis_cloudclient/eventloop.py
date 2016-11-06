@@ -2,7 +2,10 @@
 Eventloop functionality
 """
 import sys
+import time
+
 from uredis_modular.client import Client
+from .exceptions import RedisNotRunning
 
 
 class EventLoop(object):
@@ -10,10 +13,10 @@ class EventLoop(object):
     Main eventloop object to handle various events on the device
     """
     handlers = {
-        'command': 'exec_command',
-        'copy': 'copy_file',
-        'print': 'print_message',
-        'rename': 'rename_board'
+        b'command': b'exec_command',
+        b'copy': b'copy_file',
+        b'print': b'print_message',
+        b'rename': b'rename_board'
     }
     def __init__(self, name=None, redis_server=None, redis_port=18266, enable_logging=False):
         self.enable_logging = enable_logging
@@ -22,15 +25,8 @@ class EventLoop(object):
         self.redis_port = redis_port
 
         self._get_redis_host_and_port()
-        print('Connecting to cloudmanager server at %s:%d' % (self.redis_server, self.redis_port))
-        self.redis_connection = Client(self.redis_server, self.redis_port)
-
         self._determine_keys()
-        print('Registering with the server as %r' % self.name)
-
-        self._enable_logging()
         self._find_handlers()
-        self._initialize_console()
 
     ################################################################
     # Init operations
@@ -48,19 +44,16 @@ class EventLoop(object):
         """
         if not self.name:
             from bootconfig.config import get
-            self.name = get('name')
-        self.base_key = 'repl:' + self.name
-        self.command_key = self.base_key + '.command'
-        self.console_key = self.base_key + '.console'
-        self.complete_key = self.base_key + '.complete'
-
-    def _enable_logging(self):
-        """
-        Create a Logger object to send logs to redis if logging is enabled.
-        """
-        if self.enable_logging:
-            from .logging import Logger
-            self.logger = Logger(self.redis_connection, self.name)
+            self.name = get('name').encode()
+            if not self.name:
+                from bootconfig.config import set
+                import time
+                self.name = self.platform.encode() + bytes(int(time.time()))
+                set('name', self.name)
+        self.base_key = b'repl:' + self.name
+        self.command_key = self.base_key + b'.command'
+        self.console_key = self.base_key + b'.console'
+        self.complete_key = self.base_key + b'.complete'
 
     def _find_handlers(self):
         """
@@ -68,16 +61,16 @@ class EventLoop(object):
         the method
         """
         for key, value in self.handlers.items():
-            if isinstance(self.handlers[key], str):
+            if isinstance(self.handlers[key], bytes):
                 try:
-                    operation = getattr(self, self.handlers[key])
+                    operation = getattr(self, self.handlers[key].decode())
                 except AttributeError:
                     # No method with the specified name
                     print('No method %r found' % self.handlers[key])
                     continue
                 del self.handlers[key]
-                new_key = self.base_key + '.' + key
-                self.handlers[new_key.encode()] = operation
+                new_key = self.base_key + b'.' + key
+                self.handlers[new_key] = operation
 
     def _get_redis_host_and_port(self):
         """
@@ -97,8 +90,8 @@ class EventLoop(object):
         """
         from .console import RedisStream
         self.console = RedisStream(redis=self.redis_connection, redis_key=self.console_key)
-        if sys.platform not in ['WiPy']:
-            # Dupterm is currently broken on wipy
+        if sys.platform not in ['WiPy', 'linux']:
+            # Dupterm is currently broken on wipy and unix
             from uos import dupterm
             dupterm(self.console)
         self.clear_keys()
@@ -127,8 +120,8 @@ class EventLoop(object):
             the ttl expires the key is removed from the redis
             server.  Default: 30 seconds
         """
-        key = 'board:' + self.name
-        key_info = 'boardinfo:' + self.name
+        key = b'board:' + self.name
+        key_info = b'boardinfo:' + self.name
         self.redis_connection.execute_command('SETEX', key, ttl, state)
         self.redis_connection.execute_command('SETEX', key_info, ttl, sys.platform)
 
@@ -146,9 +139,10 @@ class EventLoop(object):
         bytes
             The handler name or None if no such handler
         """
-        if key.startswith(self.base_key + '.'):
+        if key.startswith(self.base_key + b'.'):
             handler = key[len(self.base_key)+1:]
-            if handler in self.handlers.keys():
+            print(handler, self.handlers.keys())
+            if self.handlers.get(handler, None):
                 return handler
 
     def handle_queues(self, timeout=1):
@@ -164,14 +158,24 @@ class EventLoop(object):
             queuekey, value = response
             handler = self.handlers.get(queuekey, self.not_implemented)
             if self.enable_logging:
-                self.logger.get_log_level()
-                self.logger.debug('running handler %r', handler)
+                print('running handler %r', self.keyname_to_handler(handler))
             rc = handler(value)
 
     def run(self):
         """
         Start the eventloop
         """
+        print('Connecting to cloudmanager server at %s:%d' % (self.redis_server, self.redis_port))
+        try:
+            self.redis_connection = Client(self.redis_server, self.redis_port)
+        except OSError:
+            raise RedisNotRunning(
+                'The Cloudmanager service is not running at %s:%s' % (self.redis_server, self.redis_port)
+            )
+        self._initialize_console()
+        print('Registering with the server as %r' % self.name.decode())
+
+
         while True:
             self.heartbeat(state=b'idle')
             self.handle_queues()
@@ -184,17 +188,15 @@ class EventLoop(object):
         """
         print('Recieved an event for a non-existant operation %r' % queuekey)
 
-    def copy_file(self, filename, buffer_size=256):
+    def copy_file(self, transaction_key, buffer_size=256):
         self.heartbeat(state=b'copying', ttl=30)
-        file_key = b'file:' + self.name + b':' + filename
-        file_dest_key = b'filedest:' + self.name + b':' + filename
-        dest = self.redis_connection.execute_command('GET', file_dest_key)
-        if dest:
-            filename = dest
-        file_size = int(self.redis_connection.execute_command('STRLEN', file_key))
+        file_key = self.redis_connection.execute_command('HGET', transaction_key, 'source')
+        filename = self.redis_connection.execute_command('HGET', transaction_key, 'dest')
+        print('Copying file %r' % filename)
+        # file_size = int(self.redis_connection.execute_command('STRLEN', file_key))
         position = 0
-        while True:
-            with open(filename, 'w') as file_handle:
+        with open(filename, 'wb') as file_handle:
+            while True:
                 end = position + buffer_size
                 data = self.redis_connection.execute_command('GETRANGE', file_key, position, end)
                 if data:
@@ -202,6 +204,9 @@ class EventLoop(object):
                 if len(data) < buffer_size:
                     break
                 position += len(data)
+        self.redis_connection.execute_command('DEL', transaction_key)
+        self.signal_completion(0)
+        self.heartbeat(state=b'idle')
 
     def exec_command(self, command):
         """
@@ -221,6 +226,7 @@ class EventLoop(object):
         self.console.clear()
         self.clear_completion_queue()
         self.heartbeat(state=b'running', ttl=30)
+
         try:
             exec(command)
             rc = 0
@@ -228,6 +234,7 @@ class EventLoop(object):
             from sys import print_exception
             print_exception(exc)
             rc = 1
+
         self.console.flush()
         self.signal_completion(rc)
         self.heartbeat(state=b'idle')
@@ -237,7 +244,7 @@ class EventLoop(object):
         print(message.decode())
 
     def rename_board(self, name):
-        name = name.decode()
+        name = name
         from bootconfig.config import set
         self.heartbeat(state=b'renaming', ttl=1)
         self.name = name
@@ -250,5 +257,20 @@ def start():
     Start the event loop
     """
     print('Redis CloudClient starting')
+    retry_time = 5
     eventloop = EventLoop()
-    eventloop.run()
+    while True:
+        try:
+            eventloop.run()
+        except RedisNotRunning:
+            print(
+                'Could not connect to the cloudmanager server at %s:%s, retrying in %d seconds' % (
+                    eventloop.redis_server, eventloop.redis_port, retry_time
+                )
+            )
+            time.sleep(retry_time)
+            retry_time *= 2
+            if retry_time > 900:
+                print('Giving up')
+                break
+

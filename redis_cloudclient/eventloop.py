@@ -15,7 +15,6 @@ class EventLoop(object):
     handlers = {
         b'command': b'exec_command',
         b'copy': b'copy_file',
-        b'print': b'print_message',
         b'rename': b'rename_board'
     }
     def __init__(self, name=None, redis_server=None, redis_port=18266, enable_logging=False):
@@ -180,7 +179,6 @@ class EventLoop(object):
             self.heartbeat(state=b'idle')
             self.handle_queues()
 
-
     # Operations handlers
     def not_implemented(self, queuekey):
         """
@@ -239,9 +237,6 @@ class EventLoop(object):
         self.signal_completion(rc)
         self.heartbeat(state=b'idle')
         return rc
-
-    def print_message(self, message):
-        print(message.decode())
 
     def rename_board(self, name):
         name = name

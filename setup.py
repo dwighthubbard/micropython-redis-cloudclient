@@ -22,6 +22,6 @@ interface with a central redis server.""",
     maintainer='Dwight Hubbard',
     maintainer_email='dwight@dwighthubbard.com',
     packages=['redis_cloudclient'],
-    version='0.0.61',
+    version='0.0.63',
     zip_safe=True,
 )

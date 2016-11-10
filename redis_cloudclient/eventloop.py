@@ -191,6 +191,7 @@ class EventLoop(object):
 
     def makedirs(self, filename):
         directory = ''
+        filename = filename.decode()
         for part in filename.split('/')[:-1]:
             directory = directory + '/' + part
             if not os.path.exists(directory):

@@ -191,10 +191,14 @@ class EventLoop(object):
 
     def makedirs(self, filename):
         directory = ''
+        if not filename:
+            return
         filename = filename.decode()
         for part in filename.split('/')[:-1]:
             directory = directory + '/' + part
-            if not os.path.exists(directory):
+            try:
+                os.stat(directory)
+            except OSError:
                 os.mkdir(directory)
 
     def copy_file(self, transaction_key, buffer_size=256):

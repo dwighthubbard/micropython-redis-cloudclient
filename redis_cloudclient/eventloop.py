@@ -1,6 +1,7 @@
 """
 Eventloop functionality
 """
+import os
 import sys
 import time
 
@@ -15,7 +16,6 @@ class EventLoop(object):
     handlers = {
         b'command': b'exec_command',
         b'copy': b'copy_file',
-        b'print': b'print_message',
         b'rename': b'rename_board'
     }
     def __init__(self, name=None, redis_server=None, redis_port=18266, enable_logging=False):
@@ -188,6 +188,14 @@ class EventLoop(object):
         """
         print('Recieved an event for a non-existant operation %r' % queuekey)
 
+
+    def makedirs(self, filename):
+        directory = ''
+        for part in filename.split('/')[:-1]:
+            directory = directory + '/' + part
+            if not os.path.exists(directory):
+                os.mkdir(directory)
+
     def copy_file(self, transaction_key, buffer_size=256):
         self.heartbeat(state=b'copying', ttl=30)
         file_key = self.redis_connection.execute_command('HGET', transaction_key, 'source')
@@ -239,9 +247,6 @@ class EventLoop(object):
         self.signal_completion(rc)
         self.heartbeat(state=b'idle')
         return rc
-
-    def print_message(self, message):
-        print(message.decode())
 
     def rename_board(self, name):
         name = name

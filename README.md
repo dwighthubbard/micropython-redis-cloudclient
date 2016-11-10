@@ -17,7 +17,7 @@ To install on esp8266 modules:
 
 Set the MICROPYPATH environment variable to point to the scripts directory.
 
-    $ MICROPYPATH=scripts;micropython -m upip install micropython-redis-cloudclient
+    $ export MICROPYPATH=scripts;micropython -m upip install micropython-redis-cloudclient
 
 ### Step 3. Deploy the module to the esp8266.
 

@@ -207,7 +207,9 @@ class EventLoop(object):
         filename = self.redis_connection.execute_command('HGET', transaction_key, 'dest')
         if filename:
             self.makedirs(filename)
-            print('Copying file %r' % filename)
+            message = 'Copying file to %r' % filename
+            print(message)
+            self.heartbeat(state=message.encode())
             # file_size = int(self.redis_connection.execute_command('STRLEN', file_key))
             position = 0
             with open(filename, 'wb') as file_handle:

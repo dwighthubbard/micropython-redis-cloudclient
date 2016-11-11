@@ -54,6 +54,7 @@ class EventLoop(object):
         self.command_key = self.base_key + b'.command'
         self.console_key = self.base_key + b'.console'
         self.complete_key = self.base_key + b'.complete'
+        self.copied_key = self.base_key + b'.copied'
 
     def _find_handlers(self):
         """
@@ -221,6 +222,7 @@ class EventLoop(object):
                         break
                     position += len(data)
         self.redis_connection.execute_command('DEL', transaction_key)
+        self.redis_connection.execute_command('RPUSH', self.copied_key, filename)
         self.signal_completion(0)
         self.heartbeat(state=b'idle')
 

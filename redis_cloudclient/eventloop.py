@@ -101,7 +101,7 @@ class EventLoop(object):
 
     def _generate_name(self):
         registry_key = 'boardregistry:' + sys.platform
-        name = sys.platform.lower() + str(self.redis_connection.execute_command('INCR', registry_key))
+        name = sys.platform.lower() + '-' + str(self.redis_connection.execute_command('INCR', registry_key))
         return name.encode()
 
     def clear_completion_queue(self):

@@ -89,6 +89,9 @@ class RedisStream(object):
         self._connection.execute_command('DEL', self.redis_stdout_key)
         self._connection.execute_command('DEL', self.redis_stdin_key)
 
+    def init(self):
+        pass
+
     def deinit(self):
         pass
 

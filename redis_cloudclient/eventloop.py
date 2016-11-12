@@ -92,12 +92,18 @@ class EventLoop(object):
         """
         from .console import RedisStream
         self.console = RedisStream(redis=self.redis_connection, redis_key=self.console_key)
-        if sys.platform not in ['WiPy', 'linux']:
+        if sys.platform not in [
+            'WiPy',
+            'linux'
+        ]:
             # Dupterm is currently broken on wipy and unix
             from uos import dupterm
             dupterm(self.console)
         self.clear_keys()
         self.console.clear()
+        if sys.platform.lower() in ['wipy']:
+            import network
+            self.redis_connection.execute_command('SET', self.console_key, network.WLAN().ifconfig()[0])
 
     def _generate_name(self):
         registry_key = 'boardregistry:' + sys.platform
@@ -264,6 +270,13 @@ class EventLoop(object):
         self.heartbeat(state=b'idle')
         return rc
 
+    def rename_handlers(self):
+        for handler_name, handler in self.handlers.items():
+            handler_operation = handler_name.decode()
+            handler_operation = handler_operation.split('.')[-1].encode()
+            self.handlers[b'repl:' + self.name + b'.' + handler_operation] = handler
+            self.redis_connection.execute_command('DEL', handler_name)
+
     def rename_board(self, name):
         print('Renaming board to %s' % name)
         name = name
@@ -272,6 +285,7 @@ class EventLoop(object):
         self.name = name
         set('name', name)
         self._remove_keys()
+        self.rename_handlers()
         self._determine_keys()
         self.heartbeat(state=b'idle')
 

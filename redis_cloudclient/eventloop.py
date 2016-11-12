@@ -18,8 +18,7 @@ class EventLoop(object):
         b'copy': b'copy_file',
         b'rename': b'rename_board'
     }
-    def __init__(self, name=None, redis_server=None, redis_port=18266, enable_logging=False):
-        self.enable_logging = enable_logging
+    def __init__(self, name=None, redis_server=None, redis_port=18266):
         self.name = name
         self.redis_server = redis_server
         self.redis_port = redis_port
@@ -46,14 +45,17 @@ class EventLoop(object):
             from bootconfig.config import get
             self.name = get('name').encode()
             if not self.name:
-                from bootconfig.config import set
-                import time
-                self.name = self.platform.encode() + bytes(int(time.time()))
-                set('name', self.name)
+                self.name = 'unregistered'
         self.base_key = b'repl:' + self.name
         self.command_key = self.base_key + b'.command'
         self.console_key = self.base_key + b'.console'
         self.complete_key = self.base_key + b'.complete'
+
+    def _remove_keys(self):
+        self.redis_connection.execute_command('DEL', self.base_key)
+        self.redis_connection.execute_command('DEL', self.command_key)
+        self.redis_connection.execute_command('DEL', self.console_key)
+        self.redis_connection.execute_command('DEL', self.complete_key)
 
     def _find_handlers(self):
         """
@@ -96,6 +98,11 @@ class EventLoop(object):
             dupterm(self.console)
         self.clear_keys()
         self.console.clear()
+
+    def _generate_name(self):
+        registry_key = 'boardregistry:' + sys.platform
+        name = sys.platform.lower() + str(self.redis_connection.execute_command('INCR', registry_key))
+        return name.encode()
 
     def clear_completion_queue(self):
         self.redis_connection.execute_command('DEL', self.complete_key)
@@ -157,8 +164,6 @@ class EventLoop(object):
         if response:
             queuekey, value = response
             handler = self.handlers.get(queuekey, self.not_implemented)
-            if self.enable_logging:
-                print('running handler %r', self.keyname_to_handler(handler))
             rc = handler(value)
 
     def run(self):
@@ -172,14 +177,15 @@ class EventLoop(object):
             raise RedisNotRunning(
                 'The Cloudmanager service is not running at %s:%s' % (self.redis_server, self.redis_port)
             )
+        self._remove_keys()
+        if self.name == 'unregistered':
+            self.rename_board(self._generate_name())
         self._initialize_console()
         print('Registering with the server as %r' % self.name.decode())
-
 
         while True:
             self.heartbeat(state=b'idle')
             self.handle_queues()
-
 
     # Operations handlers
     def not_implemented(self, queuekey):
@@ -187,7 +193,6 @@ class EventLoop(object):
         Handler that gets called if no handler is defined
         """
         print('Recieved an event for a non-existant operation %r' % queuekey)
-
 
     def makedirs(self, filename):
         directory = ''
@@ -260,11 +265,14 @@ class EventLoop(object):
         return rc
 
     def rename_board(self, name):
+        print('Renaming board to %s' % name)
         name = name
         from bootconfig.config import set
         self.heartbeat(state=b'renaming', ttl=1)
         self.name = name
         set('name', name)
+        self._remove_keys()
+        self._determine_keys()
         self.heartbeat(state=b'idle')
 
 

@@ -111,13 +111,20 @@ class RedisStream(object):
 
 class NullIO(object):
     def read(self):
-        pass
+        return b''
 
-    def write(self):
-        pass
+    def write(self, data):
+        return len(data)
 
     def clear(self):
         pass
 
     def flush(self):
         pass
+
+    def sendbreak(self):
+        pass
+
+    def readall(self):
+        return b''
+

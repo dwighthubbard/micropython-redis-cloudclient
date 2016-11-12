@@ -119,7 +119,7 @@ class EventLoop(object):
         """
         self.redis_connection.execute_command('RPUSH', self.complete_key, rc)
 
-    def heartbeat(self, state=b'idle', ttl=300):
+    def heartbeat(self, state=b'idle', ttl=5):
         """
         Update the board heartbeat key (and it's time to live)
 
@@ -213,7 +213,7 @@ class EventLoop(object):
                 os.mkdir(directory)
 
     def copy_file(self, transaction_key, buffer_size=256):
-        self.heartbeat(state=b'copying', ttl=30)
+        self.heartbeat(state=b'copying', ttl=60)
         file_key = self.redis_connection.execute_command('HGET', transaction_key, 'source')
         filename = self.redis_connection.execute_command('HGET', transaction_key, 'dest')
         if filename:
@@ -281,7 +281,7 @@ class EventLoop(object):
         print('Renaming board to %s' % name)
         name = name
         from bootconfig.config import set
-        self.heartbeat(state=b'renaming', ttl=1)
+        self.heartbeat(state=b'renaming')
         self.name = name
         set('name', name)
         self._remove_keys()

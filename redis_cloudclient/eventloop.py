@@ -16,15 +16,19 @@ class EventLoop(object):
     handlers = {
         b'command': b'exec_command',
         b'copy': b'copy_file',
-        b'rename': b'rename_board'
+        b'rename': b'rename_board',
+        b'reset': b'reset_board',
     }
-    def __init__(self, name=None, redis_server=None, redis_port=18266):
+    def __init__(self, name=None, redis_server=None, redis_port=18266, reset_after=None):
         self.name = name
         self.redis_server = redis_server
         self.redis_port = redis_port
+        self.reset_after = reset_after
+        self.debug_exec = None
 
         self._get_redis_host_and_port()
         self._determine_keys()
+        self._parse_settings()
         self._find_handlers()
 
     ################################################################
@@ -36,6 +40,14 @@ class EventLoop(object):
         """
         for key in [self.command_key, self.complete_key, self.console_key]:
             self.redis_connection.execute_command('DEL', key)
+
+    def _parse_settings(self):
+        if self.reset_after is None:
+            from bootconfig.config import get
+            self.reset_after = self.is_true(get('cloudmanager_reset_after'))
+        if self.debug_exec is None:
+            from bootconfig.config import get
+            self.debug_exec = self.is_true(get('cloudmanager_debug_exec'))
 
     def _determine_keys(self):
         """
@@ -50,12 +62,17 @@ class EventLoop(object):
         self.command_key = self.base_key + b'.command'
         self.console_key = self.base_key + b'.console'
         self.complete_key = self.base_key + b'.complete'
+        self.heartbeat_key = b'board:' + self.name
+        self.boardinfo_key = b'boardinfo:' + self.name
+
 
     def _remove_keys(self):
         self.redis_connection.execute_command('DEL', self.base_key)
         self.redis_connection.execute_command('DEL', self.command_key)
         self.redis_connection.execute_command('DEL', self.console_key)
         self.redis_connection.execute_command('DEL', self.complete_key)
+        self.redis_connection.execute_command('DEL', self.heartbeat_key)
+        self.redis_connection.execute_command('DEL', self.boardinfo_key)
 
     def _find_handlers(self):
         """
@@ -91,7 +108,7 @@ class EventLoop(object):
         Initialize the console redirection for the event loop
         """
         from .console import RedisStream
-        self.console = RedisStream(redis=self.redis_connection, redis_key=self.console_key)
+        self.console = RedisStream(redis=self.redis_connection, redis_key=self.console_key, heartbeat_key=self.)
         if sys.platform not in [
             'WiPy',
             'linux'
@@ -133,10 +150,8 @@ class EventLoop(object):
             the ttl expires the key is removed from the redis
             server.  Default: 30 seconds
         """
-        key = b'board:' + self.name
-        key_info = b'boardinfo:' + self.name
-        self.redis_connection.execute_command('SETEX', key, ttl, state)
-        self.redis_connection.execute_command('SETEX', key_info, ttl, sys.platform)
+        self.redis_connection.execute_command('SETEX', self.heartbeat_key, ttl, state)
+        self.redis_connection.execute_command('SETEX', self.boardinfo_key, ttl, sys.platform)
 
     def keyname_to_handler(self, key):
         """
@@ -208,9 +223,9 @@ class EventLoop(object):
         for part in filename.split('/')[:-1]:
             directory = directory + '/' + part
             try:
-                os.stat(directory)
-            except OSError:
                 os.mkdir(directory)
+            except OSError:
+                pass
 
     def copy_file(self, transaction_key, buffer_size=256):
         self.heartbeat(state=b'copying', ttl=60)
@@ -257,6 +272,9 @@ class EventLoop(object):
         self.clear_completion_queue()
         self.heartbeat(state=b'running', ttl=30)
 
+        if self.debug_exec:
+            print('Running')
+            print(command)
         try:
             exec(command)
             rc = 0
@@ -268,6 +286,9 @@ class EventLoop(object):
         self.console.flush()
         self.signal_completion(rc)
         self.heartbeat(state=b'idle')
+        if self.reset_after:
+            self.reset_board('After running command')
+
         return rc
 
     def rename_handlers(self):
@@ -281,13 +302,25 @@ class EventLoop(object):
         print('Renaming board to %s' % name)
         name = name
         from bootconfig.config import set
-        self.heartbeat(state=b'renaming')
+        self.heartbeat(state=b'renaming', ttl=3)
         self.name = name
         set('name', name)
         self._remove_keys()
         self.rename_handlers()
         self._determine_keys()
         self.heartbeat(state=b'idle')
+
+    def reset_board(self, reason):
+        print('Resetting board ', reason)
+        self._remove_keys()
+        self.heartbeat(state=b'reseting', ttl=10)
+        import machine
+        machine.reset()
+
+    def is_true(self, value):
+        if value.lower() in ['1', 'true', 'enable']:
+            return True
+        return False
 
 
 def start():

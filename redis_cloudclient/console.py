@@ -10,6 +10,7 @@ class RedisStream(object):
     """
     _read_position = 0
     _connection = None
+    redis_heartbeat_key = None
 
     def __init__(self, redis, redis_key, heartbeat_key=None, buffer_size=80, ttl=30):
         self._connection = redis
@@ -69,10 +70,10 @@ class RedisStream(object):
             self.flush()
         if len(data) > self._buffer_size:
             self._connection.execute_command('APPEND', self.redis_stdout_key, bytes(data))
+            if self.redis_heartbeat_key:
+                self._connection.execute_command('SETEX', self.heartbeat_key, self.ttl, b'running')
         else:
             self._buffer += bytes(data)
-        if self.redis_heartbeat_key:
-            self.redis_connection.execute_command('SETEX', self.heartbeat_key, self.ttl, b'running')
 
         return len(data)
 

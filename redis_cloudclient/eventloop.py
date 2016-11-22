@@ -108,7 +108,9 @@ class EventLoop(object):
         Initialize the console redirection for the event loop
         """
         from .console import RedisStream
-        self.console = RedisStream(redis=self.redis_connection, redis_key=self.console_key, heartbeat_key=self.)
+        self.console = RedisStream(
+            redis=self.redis_connection, redis_key=self.console_key, heartbeat_key=self.heartbeat_key
+        )
         if sys.platform not in [
             'WiPy',
             'linux'
@@ -292,6 +294,9 @@ class EventLoop(object):
         return rc
 
     def rename_handlers(self):
+        """
+        Change the handler keys
+        """
         for handler_name, handler in self.handlers.items():
             handler_operation = handler_name.decode()
             handler_operation = handler_operation.split('.')[-1].encode()
@@ -299,6 +304,13 @@ class EventLoop(object):
             self.redis_connection.execute_command('DEL', handler_name)
 
     def rename_board(self, name):
+        """
+        Change the name of the current board
+
+        Parameters
+        ----------
+        name : str
+        """
         print('Renaming board to %s' % name)
         name = name
         from bootconfig.config import set
